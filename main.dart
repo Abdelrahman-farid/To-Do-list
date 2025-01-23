@@ -1,198 +1,179 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
-class Todolist extends StatefulWidget {
-  const Todolist({super.key});
+void main() => runApp(PomodoroTimerApp());
+
+class PomodoroTimerApp extends StatelessWidget {
+  const PomodoroTimerApp({super.key});
 
   @override
-  State<Todolist> createState() => _TodolistState();
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: PomodoroTimerScreen(),
+    );
+  }
 }
 
-class _TodolistState extends State<Todolist> {
-  final TextEditingController _textController = TextEditingController();
+class PomodoroTimerScreen extends StatefulWidget {
+  const PomodoroTimerScreen({super.key});
 
-  final List<Map<String, dynamic>> _tasks = [
-    {"title": "Example Task", "completed": false}
-  ];
+  @override
+  // ignore: library_private_types_in_public_api
+  _PomodoroTimerScreenState createState() => _PomodoroTimerScreenState();
+}
 
-  void _addTask() {
-    final text = _textController.text.trim();
-    if (text.isNotEmpty && !_tasks.any((task) => task['title'] == text)) {
+class _PomodoroTimerScreenState extends State<PomodoroTimerScreen> {
+  int _selectedMinutes = 25;
+  int _remainingSeconds = 0;
+  Timer? _timer;
+  bool _isRunning = false;
+
+  void _startTimer() {
+    setState(() {
+      _remainingSeconds = _selectedMinutes * 60;
+      _isRunning = true;
+    });
+    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+      if (_remainingSeconds > 0) {
+        setState(() {
+          _remainingSeconds--;
+        });
+      } else {
+        timer.cancel();
+        setState(() {
+          _isRunning = false;
+        });
+      }
+    });
+  }
+
+  void _pauseTimer() {
+    if (_timer != null) {
+      _timer!.cancel();
       setState(() {
-        _tasks.add({"title": text, "completed": false});
-        _textController.clear();
-        FocusScope.of(context).unfocus(); // Dismiss the keyboard
+        _isRunning = false;
       });
-    } else {
-      _showMessage("Task is either empty or already exists!");
     }
   }
 
-  void _toggleCompletion(int index) {
+  void _resetTimer() {
+    if (_timer != null) {
+      _timer!.cancel();
+    }
     setState(() {
-      _tasks[index]["completed"] = !_tasks[index]["completed"];
+      _remainingSeconds = 0;
+      _isRunning = false;
     });
   }
 
-  void _deleteTask(int index) {
-    setState(() {
-      _tasks.removeAt(index);
-    });
-  }
-
-  void _confirmDelete(int index) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Delete'),
-        content: const Text('Are you sure you want to delete this task?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              _deleteTask(index);
-              Navigator.pop(context);
-            },
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+  String _formatTime(int seconds) {
+    final minutes = seconds ~/ 60;
+    final secs = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
   @override
   Widget build(BuildContext context) {
-    final int taskCount = _tasks.length;
+    final timeString = _remainingSeconds > 0
+        ? _formatTime(_remainingSeconds)
+        : _formatTime(_selectedMinutes * 60);
+
+    final progress = _remainingSeconds > 0
+        ? _remainingSeconds / (_selectedMinutes * 60)
+        : 1.0;
 
     return Scaffold(
-      backgroundColor: Colors.grey[200],
       appBar: AppBar(
-        backgroundColor: Colors.blue,
+        backgroundColor: Colors.red,
+        title: Text('Pomodoro Timer'),
         centerTitle: true,
-        title: Text(
-          "All toDos ($taskCount)",
-          style: const TextStyle(color: Colors.white, fontSize: 25),
-        ),
       ),
       body: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
-              itemCount: _tasks.length,
-              itemBuilder: (context, index) {
-                final task = _tasks[index];
-                final bool isCompleted = task["completed"];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  child: ListTile(
-                    title: Text(
-                      task["title"],
-                      style: TextStyle(
-                        fontSize: 18,
-                        decoration: isCompleted
-                            ? TextDecoration.lineThrough
-                            : null,
-                      ),
-                      overflow: TextOverflow.ellipsis, // Handle long titles
-                    ),
-                    leading: IconButton(
-                      onPressed: () => _toggleCompletion(index),
-                      icon: Icon(
-                        isCompleted
-                            ? Icons.check_box
-                            : Icons.check_box_outline_blank,
-                        color: Colors.blue,
-                      ),
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (!isCompleted)
-                          ElevatedButton(
-                            onPressed: () {
-                              _showMessage("Task started!");
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                            ),
-                            child: const Text("Start"),
-                          ),
-                        if (isCompleted)
-                          IconButton(
-                            onPressed: () => _confirmDelete(index),
-                            icon: const Icon(
-                              Icons.delete,
-                              color: Colors.red,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          Padding(
-            padding:
-                const EdgeInsets.only(bottom: 20, right: 20, left: 20),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.grey,
-                          offset: Offset(0.0, 0.0),
-                          blurRadius: 10,
-                          spreadRadius: 0.0,
-                        )
-                      ],
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: TextField(
-                      controller: _textController,
-                      decoration: const InputDecoration(
-                        hintText: "Add a new To-Do item",
-                        hintStyle: TextStyle(color: Colors.blueGrey),
-                        border: InputBorder.none,
-                      ),
-                    ),
-                  ),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: 200,
+                height: 200,
+                child: CircularProgressIndicator(
+                  value: progress,
+                  strokeWidth: 10,
+                  backgroundColor: Colors.grey[300],
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
                 ),
-                const SizedBox(
-                  width: 10,
+              ),
+              Text(
+                timeString,
+                style: TextStyle(
+                  fontSize: 40,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 32),
+          if (!_isRunning)
+            Column(
+              children: [
+                Text(
+                  'Select Timer Duration (minutes):',
+                  style: TextStyle(fontSize: 16),
+                ),
+                Slider(
+                  value: _selectedMinutes.toDouble(),
+                  min: 1,
+                  max: 60,
+                  divisions: 59,
+                  label: _selectedMinutes.toString(),
+                  activeColor: Colors.purple,
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedMinutes = value.toInt();
+                    });
+                  },
                 ),
                 ElevatedButton(
-                  onPressed: _addTask,
+                  onPressed: _startTimer,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    fixedSize: const Size(50, 50),
-                    shape: const RoundedRectangleBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(20)),
-                    ),
-                    elevation: 10,
+                    backgroundColor: Colors.green,
                   ),
-                  child: const Text(
-                    "+",
-                    style: TextStyle(fontSize: 35, color: Colors.white),
+                  child: Text(
+                    'Start',
+                    style: TextStyle(color: Colors.white),
                   ),
-                )
+                ),
+              ],
+            )
+          else
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton(
+                  onPressed: _pauseTimer,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                  ),
+                  child: Text(
+                    'Pause',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+                SizedBox(width: 16),
+                ElevatedButton(
+                  onPressed: _resetTimer,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                  ),
+                  child: Text(
+                    'Reset',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
               ],
             ),
-          ),
         ],
       ),
     );
